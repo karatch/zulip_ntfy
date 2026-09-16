@@ -24,3 +24,16 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
+
+def load_config():
+    logging.info(f"[Main] Чтение конфигурационного файла: {ZULIPRC_PATH}")
+    if not os.path.exists(ZULIPRC_PATH):
+        raise FileNotFoundError(f"Критическая ошибка: Файл {ZULIPRC_PATH} не найден!")
+
+    config = configparser.ConfigParser()
+    config.read(ZULIPRC_PATH)
+    try:
+        zulip_site = config.get('api', 'site').rstrip('/')
+        return {"zulip_site": zulip_site}
+    except Exception as e:
+        raise KeyError(f"Ошибка чтения секций в zuliprc: {e}")
