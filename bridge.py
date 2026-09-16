@@ -59,6 +59,7 @@ class ZulipNtfyBridge:
             return []
 
     def process_event(self, event: dict) -> None:
+        import urllib.parse
         if event.get('type') != 'message':
             return
 
@@ -85,7 +86,6 @@ class ZulipNtfyBridge:
         logging.info(f"[Bridge] Перехвачено сообщение из [{stream_name}]")
 
         # прямая ссылка на сообщение в Zulip для клика внутри пуша
-        import urllib.parse
         encoded_stream = f"{stream_id}-{stream_name.replace(' ', '.')}"
         encoded_topic = urllib.parse.quote(topic.replace(' ', '.'))
         msg_url = f"{self.zulip_site}/#narrow/stream/{encoded_stream}/topic/{encoded_topic}/near/{message_id}"
@@ -119,4 +119,27 @@ class ZulipNtfyBridge:
         except Exception as e:
             logging.critical(f"[Bridge] Критическая ошибка потока прослушивания событий Zulip: {e}")
 
+    async def start(self, session):
+        self.session = session
+        while True:
+            try:
+                self.zulip_client = await asyncio.wait_for(
+                    self.loop.run_in_executor(None, lambda: zulip.Client(config_file=str(self.zuliprc_path))),
+                    timeout=10.0
+                )
+                self.bot_email = self.zulip_client.email
+                logging.info(f"[Bridge] Успешная авторизация в Zulip: {self.bot_email}")
+                break
+            except (asyncio.TimeoutError, Exception) as e:
+                logging.error(f"[Bridge] Ошибка авторизации в Zulip: {e}. Повтор через 15 секунд...")
+                await asyncio.sleep(15)
 
+        async def safe_listener_loop():
+            while True:
+                try:
+                    await self.loop.run_in_executor(None, self.start_zulip_listener)
+                except Exception as e:
+                    logging.error(f"[Bridge] Поток слушателя Zulip упал: {e}")
+                await asyncio.sleep(15)
+
+        asyncio.create_task(safe_listener_loop())
