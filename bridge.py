@@ -44,3 +44,17 @@ class ZulipNtfyBridge:
                             f"[Bridge API] Ошибка ntfy API (Статус {response.status}) для ID {zulip_id}: {res_text}")
             except Exception as e:
                 logging.error(f"[Bridge API] Исключение сети при отправке в ntfy для ID {zulip_id}: {e}")
+
+    def get_stream_subscribers(self, stream_name: str, stream_id: int = None) -> list:
+        try:
+            logging.debug(f"[Bridge] Запрос списка подписчиков для стрима '{stream_name}'...")
+            result = self.zulip_client.get_subscribers(stream=stream_name)
+            if result.get('result') != 'success' and stream_id is not None:
+                result = self.zulip_client.get_subscribers(stream_id=stream_id)
+
+            if result.get('result') == 'success':
+                return result.get('subscribers', [])
+            return []
+        except Exception as e:
+            logging.error(f"[Bridge] Исключение при получении подписчиков Zulip: {e}")
+            return []
