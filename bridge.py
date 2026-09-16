@@ -61,7 +61,6 @@ class ZulipNtfyBridge:
             return []
 
     def process_event(self, event: dict) -> None:
-        import urllib.parse
         if event.get('type') != 'message':
             return
 
@@ -75,7 +74,9 @@ class ZulipNtfyBridge:
         sender_id = msg['sender_id']
         sender_name = msg['sender_full_name']
         topic = msg.get('subject', 'Без темы')
-        content = msg['content']
+
+        # берем 'content_raw' (Markdown)
+        content = msg.get('content_raw', msg.get('content', ''))
 
         stream_name = msg.get('display_recipient', 'Неизвестный стрим')
         stream_id = msg.get('stream_id')
@@ -87,7 +88,7 @@ class ZulipNtfyBridge:
         logging.info(f"--- [DEBUG START] ---")
         logging.info(f"[Bridge] Перехвачено сообщение из [{stream_name}]")
 
-        # прямая ссылка на сообщение в Zulip для клика внутри пуша
+        import urllib.parse
         encoded_stream = f"{stream_id}-{stream_name.replace(' ', '.')}"
         encoded_topic = urllib.parse.quote(topic.replace(' ', '.'))
         msg_url = f"{self.zulip_site}/#narrow/stream/{encoded_stream}/topic/{encoded_topic}/near/{message_id}"
@@ -99,7 +100,6 @@ class ZulipNtfyBridge:
             if user_id == sender_id:
                 continue
 
-            # отправляю пуш напрямую на топик ntfy, используя zulip_id пользователя
             sent_counter += 1
             self.loop.call_soon_threadsafe(
                 lambda u_id=user_id, sn=stream_name: asyncio.create_task(
@@ -109,6 +109,7 @@ class ZulipNtfyBridge:
 
         logging.info(f"[Bridge] Всего отправлено уведомлений в ntfy: {sent_counter}")
         logging.info(f"--- [DEBUG END] ---")
+
 
     def start_zulip_listener(self):
         logging.info("[Bridge] Установка соединения и регистрация очереди событий Zulip для ВСЕХ стримов...")
