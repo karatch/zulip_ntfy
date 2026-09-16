@@ -21,7 +21,7 @@ class ZulipNtfyBridge:
                              msg_url: str) -> None:
         logging.info(f"[Bridge API] Попытка отправки пуша в ntfy для Zulip ID: {zulip_id}")
 
-        url = url = f"https://ntfy.sh/zulip_goz_{zulip_id}"
+        url = f"https://ntfy.sh/zulip_goz_{zulip_id}"
 
         headers = {
             "Title": f"Zulip [{stream_name}] -> {topic}",
