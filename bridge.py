@@ -20,20 +20,20 @@ class ZulipNtfyBridge:
                              msg_url: str) -> None:
         logging.info(f"[Bridge API] Попытка отправки пуша в ntfy для Zulip ID: {zulip_id}")
 
-        # персональный URL топика ntfy для конкретного пользователя
-        url = f"https://ntfy.sh/zulip_goz{zulip_id}"
+        url = f"https://ntfy.sh/zulip_goz_{zulip_id}"
 
         headers = {
-            "Title": f"Zulip [{stream_name}] -> {topic}".encode('utf-8'),  # Заголовок пуша
-            "X-Click": msg_url,  # Ссылка при клике на пуш
-            "X-Tags": "speech_balloon,bell",  # Иконки уведомления
-            "X-Priority": "4"  # Высокий приоритет (важно)
+            "Title": f"Zulip [{stream_name}] -> {topic}",
+            "X-Click": msg_url,
+            "X-Tags": "speech_balloon,bell",
+            "X-Priority": "4"
         }
 
-        body = f"От: {sender_name}\n\n{message_content}".encode('utf-8')
+        body = f"От: {sender_name}\n\n{message_content}"
 
         async with self.semaphore:
             try:
+                # В aiohttp для передачи обычного текста в теле используется параметр data=body
                 async with self.session.post(url, data=body, headers=headers, timeout=5) as response:
                     if response.status == 200:
                         logging.info(f"[Bridge API] Пуш успешно доставлен в ntfy для ID {zulip_id}")
@@ -43,6 +43,7 @@ class ZulipNtfyBridge:
                             f"[Bridge API] Ошибка ntfy API (Статус {response.status}) для ID {zulip_id}: {res_text}")
             except Exception as e:
                 logging.error(f"[Bridge API] Исключение сети при отправке в ntfy для ID {zulip_id}: {e}")
+
 
     def get_stream_subscribers(self, stream_name: str, stream_id: int = None) -> list:
         try:
