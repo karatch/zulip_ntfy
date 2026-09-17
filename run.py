@@ -3,6 +3,7 @@ import asyncio
 import os
 import configparser
 import logging
+import signal
 import sys
 import aiohttp
 import urllib3
@@ -41,7 +42,15 @@ def load_config():
 
 
 async def main():
+    # событие блокировки
+    stop_event = asyncio.Event()
+
+    def handle_exit_signal():
+        print("\n[Система] Сервис остановлен пользователем через Ctrl+C.")
+        stop_event.set()
+
     loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGINT, handle_exit_signal)
 
     try:
         config = load_config()
@@ -57,15 +66,13 @@ async def main():
             logging.info("[Main] Запуск фонового моста Zulip -> ntfy...")
             await bridge.start(session)
 
-            # бесконечный цикл, удерживающий работу асинхронного приложения
-            while True:
-                await asyncio.sleep(3600)
+            await stop_event.wait()
     except Exception as e:
         logging.exception(f"[Main] Критическая ошибка в основном цикле: {e}")
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logging.info("[Main] Сервис остановлен пользователем через Ctrl+C.")
+    # try:
+    asyncio.run(main())
+    # except KeyboardInterrupt:
+    #     logging.info("[Main] Сервис остановлен пользователем через Ctrl+C.")

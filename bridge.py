@@ -2,9 +2,8 @@ import asyncio
 import logging
 import zulip
 from pathlib import Path
+import urllib.parse
 
-
-# Фоновый мост Zulip -> ntfy
 
 class ZulipNtfyBridge:
     def __init__(self, zulip_site: str, loop: asyncio.AbstractEventLoop, zuliprc_path: Path):
@@ -14,11 +13,17 @@ class ZulipNtfyBridge:
         self.bot_email = None
         self.zulip_client = None
         self.session = None
-        self.semaphore = asyncio.Semaphore(10)
+        self.semaphore = asyncio.Semaphore(30)
 
 
-    async def send_ntfy_push(self, zulip_id: str, stream_name: str, topic: str, sender_name: str, message_content: str,
-                             msg_url: str) -> None:
+    async def send_ntfy_push(
+            self, zulip_id: str,
+            stream_name: str,
+            topic: str,
+            sender_name: str,
+            message_content: str,
+            msg_url: str
+    ) -> None:
         logging.info(f"[Bridge API] Попытка отправки пуша в ntfy для Zulip ID: {zulip_id}")
 
         url = f"https://ntfy.sh/zulip_goz_{zulip_id}"
@@ -35,7 +40,7 @@ class ZulipNtfyBridge:
 
         async with self.semaphore:
             try:
-                async with self.session.post(url, data=body, headers=headers, timeout=5) as response:
+                async with self.session.post(url, data=body, headers=headers, timeout=3) as response:
                     if response.status == 200:
                         logging.info(f"[Bridge API] Пуш успешно доставлен в ntfy для ID {zulip_id}")
                     else:
@@ -75,7 +80,7 @@ class ZulipNtfyBridge:
         sender_name = msg['sender_full_name']
         topic = msg.get('subject', 'Без темы')
 
-        # берем 'content_raw' (Markdown)
+        # беру 'content_raw' для Markdown
         content = msg.get('content_raw', msg.get('content', ''))
 
         stream_name = msg.get('display_recipient', 'Неизвестный стрим')
@@ -88,7 +93,6 @@ class ZulipNtfyBridge:
         logging.info(f"--- [DEBUG START] ---")
         logging.info(f"[Bridge] Перехвачено сообщение из [{stream_name}]")
 
-        import urllib.parse
         encoded_stream = f"{stream_id}-{stream_name.replace(' ', '.')}"
         encoded_topic = urllib.parse.quote(topic.replace(' ', '.'))
         msg_url = f"{self.zulip_site}/#narrow/stream/{encoded_stream}/topic/{encoded_topic}/near/{message_id}"
