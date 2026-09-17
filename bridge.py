@@ -4,6 +4,8 @@ import zulip
 from pathlib import Path
 import urllib.parse
 
+from concurrent.futures import ThreadPoolExecutor # Добавьте в начало файла
+
 
 class ZulipNtfyBridge:
     def __init__(self, zulip_site: str, loop: asyncio.AbstractEventLoop, zuliprc_path: Path):
@@ -128,6 +130,12 @@ class ZulipNtfyBridge:
 
     async def start(self, session):
         self.session = session
+        # для корректной остановки программы при нажатии на Cntr+C
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ZulipListener")
+        # для старых версий Python
+        for thread in executor._threads:
+            thread.daemon = True
+
         while True:
             try:
                 self.zulip_client = await asyncio.wait_for(
@@ -144,7 +152,8 @@ class ZulipNtfyBridge:
         async def safe_listener_loop():
             while True:
                 try:
-                    await self.loop.run_in_executor(None, self.start_zulip_listener)
+                    logging.info("[Bridge] Запуск слушателя событий Zulip в отдельном системном потоке Executor...")
+                    await self.loop.run_in_executor(executor, self.start_zulip_listener)
                 except Exception as e:
                     logging.error(f"[Bridge] Поток слушателя Zulip упал: {e}")
                 await asyncio.sleep(15)
