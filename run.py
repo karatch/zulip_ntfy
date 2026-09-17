@@ -48,6 +48,9 @@ async def main():
     def handle_exit_signal():
         print("\n[Система] Сервис остановлен пользователем через Ctrl+C.")
         stop_event.set()
+        # принудительный выход из процесса
+        # sys.exit(0)
+        os._exit(0)
 
     loop = asyncio.get_running_loop()
     loop.add_signal_handler(signal.SIGINT, handle_exit_signal)

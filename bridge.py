@@ -130,12 +130,8 @@ class ZulipNtfyBridge:
 
     async def start(self, session):
         self.session = session
-        # для корректной остановки программы при нажатии на Cntr+C
-        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ZulipListener")
-        # для старых версий Python
-        for thread in executor._threads:
-            thread.daemon = True
 
+        # авторизация в Zulip Client
         while True:
             try:
                 self.zulip_client = await asyncio.wait_for(
@@ -149,13 +145,25 @@ class ZulipNtfyBridge:
                 logging.error(f"[Bridge] Ошибка авторизации в Zulip: {e}. Повтор через 15 секунд...")
                 await asyncio.sleep(15)
 
+        # бесконечный цикл слушателя событий
         async def safe_listener_loop():
             while True:
+                # изолированный пул потоков для блокирующего call_on_each_event
+                executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ZulipListener")
+
+                for thread in executor._threads:
+                    thread.daemon = True
+
                 try:
-                    logging.info("[Bridge] Запуск слушателя событий Zulip в отдельном системном потоке Executor...")
+                    logging.info("[Bridge] Запуск слушателя событий Zulip в выделенном системном потоке...")
                     await self.loop.run_in_executor(executor, self.start_zulip_listener)
                 except Exception as e:
-                    logging.error(f"[Bridge] Поток слушателя Zulip упал: {e}")
+                    logging.error(f"[Bridge] Поток слушателя Zulip аварийно завершился: {e}")
+                finally:
+                    executor.shutdown(wait=False)
+
+                logging.info("[Bridge] Соединение с Zulip потеряно. Перезапуск слушателя через 15 секунд...")
                 await asyncio.sleep(15)
 
         asyncio.create_task(safe_listener_loop())
+
