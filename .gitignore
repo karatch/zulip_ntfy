@@ -3,5 +3,5 @@
 
 zuliprc*
 testing/
-
-
+dist/
+build/
