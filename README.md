@@ -108,6 +108,7 @@ After=network.target
 
 [Service]
 Type=simple
+User=user
 # Путь к рабочей директории, где лежит файл zuliprc
 WorkingDirectory=/opt/zulip-ntfy
 # Путь к исполняемому файлу
