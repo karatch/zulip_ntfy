@@ -8,8 +8,19 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 class ZulipNtfyBridge:
-    def __init__(self, zulip_site: str, loop: asyncio.AbstractEventLoop, zuliprc_path: Path):
+    def __init__(
+            self,
+            zulip_site: str,
+            ntfy_host: str,
+            ntfy_prefix: str,
+            ntfy_token: str,
+            loop: asyncio.AbstractEventLoop,
+            zuliprc_path: Path
+    ):
         self.zulip_site = zulip_site
+        self.ntfy_host = ntfy_host
+        self.ntfy_token = ntfy_token
+        self.ntfy_prefix = ntfy_prefix
         self.loop = loop
         self.zuliprc_path = zuliprc_path
         self.bot_email = None
@@ -30,9 +41,9 @@ class ZulipNtfyBridge:
         logging.info(f"[Bridge API] Попытка отправки пуша в ntfy для Zulip ID: {zulip_id}")
 
         if zulip_id == "common":
-            url = f"https://ntfy.sh/zulip_goz"
+            url = f"{self.ntfy_host}/{self.ntfy_prefix}"
         else:
-            url = f"https://ntfy.sh/zulip_goz_{zulip_id}"
+            url = f"{self.ntfy_host}/{self.ntfy_prefix}_{zulip_id}"
 
         headers = {
             "Title": f"Zulip [{stream_name}] -> {topic}",
@@ -41,6 +52,8 @@ class ZulipNtfyBridge:
             "X-Priority": "4",
             "X-Markdown": "yes"  # поддержка Markdown-разметки
         }
+        if self.ntfy_token:
+            headers["Authorization"] = f"Bearer: {self.ntfy_token}"
 
         body = f"**От:** {sender_name}\n\n{message_content}"
 

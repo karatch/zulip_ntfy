@@ -41,15 +41,15 @@ def load_config():
     try:
         zulip_site = config.get('api', 'site').rstrip('/')
         ntfy_host = os.getenv("NTFY_HOST", "https://ntfy.sh").rstrip('/')
-        ntfy_secret_salt = os.getenv("NTFY_SECRET_SALT", "")
         ntfy_token = os.getenv("NTFY_AUTH_TOKEN", None)
+        ntfy_prefix = os.getenv("NTFY_TOPIC_PREFIX", "zulip_goz")
 
         logging.info(f"[Main] Конфигурация успешно загружена. Целевой ntfy: {ntfy_host}")
         return {
             "zulip_site": zulip_site,
             "ntfy_host": ntfy_host,
-            "ntfy_secret_salt": ntfy_secret_salt,
-            "ntfy_token": ntfy_token
+            "ntfy_token": ntfy_token,
+            "ntfy_prefix": ntfy_prefix
         }
     except Exception as e:
         raise KeyError(f"Ошибка чтения конфигурации: {e}")
@@ -76,7 +76,15 @@ async def main():
         return
 
     logging.info("[Main] Инициализация объекта ZulipNtfyBridge...")
-    bridge = ZulipNtfyBridge(zulip_site=config["zulip_site"], loop=loop, zuliprc_path=ZULIPRC_PATH)
+
+    bridge = ZulipNtfyBridge(
+        zulip_site=config["zulip_site"],
+        ntfy_host=config["ntfy_host"],
+        ntfy_token=config["ntfy_token"],
+        ntfy_prefix=config["ntfy_prefix"],
+        loop=loop,
+        zuliprc_path=ZULIPRC_PATH
+    )
 
     try:
         async with aiohttp.ClientSession() as session:
