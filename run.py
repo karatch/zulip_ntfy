@@ -8,6 +8,7 @@ import sys
 import aiohttp
 import urllib3
 from pathlib import Path
+from dotenv import load_dotenv
 
 from bridge import ZulipNtfyBridge
 
@@ -19,6 +20,9 @@ else:
     BASE_DIR = Path(__file__).resolve().parent
 
 ZULIPRC_PATH = BASE_DIR / "zuliprc"
+DOTENV_PATH = BASE_DIR / ".env"
+
+load_dotenv(dotenv_path=DOTENV_PATH)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,9 +40,19 @@ def load_config():
     config.read(ZULIPRC_PATH)
     try:
         zulip_site = config.get('api', 'site').rstrip('/')
-        return {"zulip_site": zulip_site}
+        ntfy_host = os.getenv("NTFY_HOST", "https://ntfy.sh").rstrip('/')
+        ntfy_secret_salt = os.getenv("NTFY_SECRET_SALT", "")
+        ntfy_token = os.getenv("NTFY_AUTH_TOKEN", None)
+
+        logging.info(f"[Main] Конфигурация успешно загружена. Целевой ntfy: {ntfy_host}")
+        return {
+            "zulip_site": zulip_site,
+            "ntfy_host": ntfy_host,
+            "ntfy_secret_salt": ntfy_secret_salt,
+            "ntfy_token": ntfy_token
+        }
     except Exception as e:
-        raise KeyError(f"Ошибка чтения секций в zuliprc: {e}")
+        raise KeyError(f"Ошибка чтения конфигурации: {e}")
 
 
 async def main():

@@ -19,17 +19,20 @@ class ZulipNtfyBridge:
 
 
     async def send_ntfy_push(
-            self, zulip_id: str,
+            self,
             stream_name: str,
             topic: str,
             sender_name: str,
             message_content: str,
-            msg_url: str
+            msg_url: str,
+            zulip_id: str = "common"
     ) -> None:
         logging.info(f"[Bridge API] Попытка отправки пуша в ntfy для Zulip ID: {zulip_id}")
 
-        url = f"https://ntfy.sh/zulip_goz_{zulip_id}"
-        # url = f"https://ntfy.sh/zulip_goz"
+        if zulip_id == "common":
+            url = f"https://ntfy.sh/zulip_goz"
+        else:
+            url = f"https://ntfy.sh/zulip_goz_{zulip_id}"
 
         headers = {
             "Title": f"Zulip [{stream_name}] -> {topic}",
@@ -101,14 +104,20 @@ class ZulipNtfyBridge:
         subscribers = self.get_stream_subscribers(stream_name, stream_id)
         sent_counter = 0
 
+        self.loop.call_soon_threadsafe(
+            lambda sn=stream_name: asyncio.create_task(
+                self.send_ntfy_push(sn, topic, sender_name, content, msg_url)
+            )
+        )
+
         for user_id in subscribers:
             if user_id == sender_id:
                 continue
 
             sent_counter += 1
             self.loop.call_soon_threadsafe(
-                lambda u_id=user_id, sn=stream_name: asyncio.create_task(
-                    self.send_ntfy_push(str(u_id), sn, topic, sender_name, content, msg_url)
+                lambda sn=stream_name, u_id=user_id: asyncio.create_task(
+                    self.send_ntfy_push(sn, topic, sender_name, content, msg_url, str(u_id))
                 )
             )
 
