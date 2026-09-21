@@ -42,7 +42,7 @@ def load_config():
 
 
 async def main():
-    # событие блокировки
+    # событие блокировки для принудительного выхода
     stop_event = asyncio.Event()
 
     def handle_exit_signal():

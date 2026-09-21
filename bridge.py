@@ -4,7 +4,7 @@ import zulip
 from pathlib import Path
 import urllib.parse
 
-from concurrent.futures import ThreadPoolExecutor # Добавьте в начало файла
+from concurrent.futures import ThreadPoolExecutor
 
 
 class ZulipNtfyBridge:
@@ -29,13 +29,14 @@ class ZulipNtfyBridge:
         logging.info(f"[Bridge API] Попытка отправки пуша в ntfy для Zulip ID: {zulip_id}")
 
         url = f"https://ntfy.sh/zulip_goz_{zulip_id}"
+        # url = f"https://ntfy.sh/zulip_goz"
 
         headers = {
             "Title": f"Zulip [{stream_name}] -> {topic}",
             "X-Click": msg_url,
             "X-Tags": "speech_balloon,bell",
             "X-Priority": "4",
-            "X-Markdown": "yes"  # Включает поддержку Markdown-разметки на клиентах ntfy
+            "X-Markdown": "yes"  # поддержка Markdown-разметки
         }
 
         body = f"**От:** {sender_name}\n\n{message_content}"
@@ -55,7 +56,6 @@ class ZulipNtfyBridge:
 
     def get_stream_subscribers(self, stream_name: str, stream_id: int = None) -> list:
         try:
-            logging.debug(f"[Bridge] Запрос списка подписчиков для стрима '{stream_name}'...")
             result = self.zulip_client.get_subscribers(stream=stream_name)
             if result.get('result') != 'success' and stream_id is not None:
                 result = self.zulip_client.get_subscribers(stream_id=stream_id)
@@ -82,7 +82,7 @@ class ZulipNtfyBridge:
         sender_name = msg['sender_full_name']
         topic = msg.get('subject', 'Без темы')
 
-        # беру 'content_raw' для Markdown
+        # 'content_raw' для Markdown
         content = msg.get('content_raw', msg.get('content', ''))
 
         stream_name = msg.get('display_recipient', 'Неизвестный стрим')
@@ -92,7 +92,6 @@ class ZulipNtfyBridge:
         if not isinstance(stream_name, str):
             return
 
-        logging.info(f"--- [DEBUG START] ---")
         logging.info(f"[Bridge] Перехвачено сообщение из [{stream_name}]")
 
         encoded_stream = f"{stream_id}-{stream_name.replace(' ', '.')}"
@@ -114,7 +113,6 @@ class ZulipNtfyBridge:
             )
 
         logging.info(f"[Bridge] Всего отправлено уведомлений в ntfy: {sent_counter}")
-        logging.info(f"--- [DEBUG END] ---")
 
 
     def start_zulip_listener(self):
@@ -131,7 +129,6 @@ class ZulipNtfyBridge:
     async def start(self, session):
         self.session = session
 
-        # авторизация в Zulip Client
         while True:
             try:
                 self.zulip_client = await asyncio.wait_for(
@@ -145,7 +142,6 @@ class ZulipNtfyBridge:
                 logging.error(f"[Bridge] Ошибка авторизации в Zulip: {e}. Повтор через 15 секунд...")
                 await asyncio.sleep(15)
 
-        # бесконечный цикл слушателя событий
         async def safe_listener_loop():
             while True:
                 # изолированный пул потоков для блокирующего call_on_each_event
@@ -166,4 +162,3 @@ class ZulipNtfyBridge:
                 await asyncio.sleep(15)
 
         asyncio.create_task(safe_listener_loop())
-
