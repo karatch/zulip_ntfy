@@ -1,0 +1,6 @@
+# работа с API мессенджера Zulip
+zulip==0.9.0
+
+aiohttp==3.11.11
+urllib3==2.3.0
+python-dotenv==1.0.1
