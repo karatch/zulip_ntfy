@@ -78,9 +78,9 @@ docker exec -it ntfy-server ntfy token add push_bridge_user
 Сотрудникам нужно право только на **чтение** (`read`) уведомлений:
 ```bash
 # Добавление пользователя для команды
-docker exec -it ntfy-server ntfy user add employee_user
+docker exec -it ntfy-server ntfy user add goz_user
 
 # Предоставление прав на чтение (read) всех топиков (*)
-docker exec -it ntfy-server ntfy access employee_user "*" read
+docker exec -it ntfy-server ntfy access goz_user "*" read
 ```
-*Пароль от `employee_user` сотрудники будут использовать для входа в мобильное приложение ntfy.*
+*Пароль от `goz_user` сотрудники будут использовать для входа в мобильное приложение ntfy.*
