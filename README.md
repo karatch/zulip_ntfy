@@ -153,3 +153,4 @@ sudo systemctl start zulip-ntfy.service
   ```bash
   sudo systemctl restart zulip-ntfy.service
   ```
+
