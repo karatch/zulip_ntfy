@@ -13,7 +13,7 @@ nano server.yml
 ```
 Вставьте следующее содержимое (замените `://company.com` на ваш домен или IP-адрес):
 ```yaml
-base-url: "https://://company.com"
+base-url: "https://company.com"
 auth-file: "/var/lib/ntfy/user.db"
 auth-default-access: "deny-all"
 behind-proxy: true
