@@ -49,7 +49,7 @@
 
 1. Установите зависимости:
    ```bash
-   pip install zulip aiohttp urllib3
+   pip install -r requirements.txt
    ```
 2. Убедитесь, что файл `zuliprc` находится в папке со скриптами `run.py` и `bridge.py`.
 3. Запустите сервис:
