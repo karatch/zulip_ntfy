@@ -1,5 +1,5 @@
 # API мессенджера Zulip
-zulip==0.9.0
+zulip==0.9.1
 
 aiohttp
 urllib3
