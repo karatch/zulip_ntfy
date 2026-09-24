@@ -24,7 +24,7 @@
 3. Найдите строку **User ID** (это числовое значение, например: `42`). Скопируйте его.
 
 ### Шаг 2. Установите приложение ntfy
-* **Android:** Скачайте ntfy из [Google Play](https://google.com) или [F-Droid](https://f-droid.org).
+* **Android:** Скачайте ntfy из [Google Play](https://google.com).
 * **iOS:** Скачайте ntfy из [App Store](https://apple.com).
 * *Также можно использовать веб-интерфейс или десктопные PWA-уведомления на сайте [ntfy.sh](https://ntfy.sh).*
 
