@@ -2,7 +2,7 @@
 .env
 
 zuliprc*
-testing/
+
 dist/
 build/
 .idea/

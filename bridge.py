@@ -36,7 +36,7 @@ class ZulipNtfyBridge:
             sender_name: str,
             message_content: str,
             msg_url: str,
-            zulip_id: str = "common"
+            zulip_id: str
     ) -> None:
         logging.info(f"[Bridge API] Попытка отправки пуша в ntfy для Zulip ID: {zulip_id}")
 
@@ -53,7 +53,7 @@ class ZulipNtfyBridge:
             "X-Markdown": "yes"  # поддержка Markdown-разметки
         }
         if self.ntfy_token:
-            headers["Authorization"] = f"Bearer: {self.ntfy_token}"
+            headers["Authorization"] = f"Bearer {self.ntfy_token}"
 
         body = f"**От:** {sender_name}\n\n{message_content}"
 
@@ -121,12 +121,6 @@ class ZulipNtfyBridge:
 
         subscribers = self.get_stream_subscribers(stream_name, stream_id)
         sent_counter = 0
-
-        self.loop.call_soon_threadsafe(
-            lambda sn=stream_name: asyncio.create_task(
-                self.send_ntfy_push(sn, topic, sender_name, content, msg_url)
-            )
-        )
 
         for user_id in subscribers:
             if user_id == sender_id:
