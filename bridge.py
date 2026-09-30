@@ -40,10 +40,7 @@ class ZulipNtfyBridge:
     ) -> None:
         logging.info(f"[Bridge API] Попытка отправки пуша в ntfy для Zulip ID: {zulip_id}")
 
-        if zulip_id == "common":
-            url = f"{self.ntfy_host}/{self.ntfy_prefix}"
-        else:
-            url = f"{self.ntfy_host}/{self.ntfy_prefix}_{zulip_id}"
+        url = f"{self.ntfy_host}/{self.ntfy_prefix}_{zulip_id}"
 
         headers = {
             "Title": f"Zulip [{stream_name}] -> {topic}",
