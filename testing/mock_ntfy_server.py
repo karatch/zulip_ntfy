@@ -32,17 +32,17 @@ async def handle_ntfy_post(request):
 
     # информация о перехваченном пуше на экран
     print("\n" + "=" * 60)
-    print(f"🔥 [ntfy Server] ПЕРЕХВАЧЕН ИСХОДЯЩИЙ ПУШ!")
+    print(f"[ntfy Server] ПЕРЕХВАЧЕН ИСХОДЯЩИЙ ПУШ!")
     print(f"Целевой топик: {topic_name}")
     print(
-        f"Статус авторизации: {'✅ Успешно (Bearer)' if is_authorized else '⚠️ Анонимный/Неавторизованный (Заголовок отсутствует)'}")
+        f"Статус авторизации: {'Успешно (Bearer)' if is_authorized else 'Анонимный/Неавторизованный (Заголовок отсутствует)'}")
     print("-" * 40)
-    print(f"📌 Заголовок (Title): {title}")
-    print(f"🏷️  Теги (X-Tags): {tags} | Приоритет: {priority}")
-    print(f"📝 Поддержка Markdown: {markdown_enabled}")
-    print(f"🔗 Ссылка для клика (X-Click): {click_url}")
+    print(f"Заголовок (Title): {title}")
+    print(f"Теги (X-Tags): {tags} | Приоритет: {priority}")
+    print(f"Поддержка Markdown: {markdown_enabled}")
+    print(f"Ссылка для клика (X-Click): {click_url}")
     print("-" * 40)
-    print(f"💬 Тело сообщения:\n{body_text}")
+    print(f"Тело сообщения:\n{body_text}")
     print("=" * 60 + "\n")
 
     # успешный JSON ответ ntfy сервера
@@ -64,5 +64,5 @@ app = web.Application()
 app.router.add_post('/{topic}', handle_ntfy_post)
 
 if __name__ == '__main__':
-    print("🚀 Локальный Mock-сервер ntfy запущен на http://127.0.0.1:8081")
+    print("Локальный Mock-сервер ntfy запущен на http://127.0.0.1:8081")
     web.run_app(app, port=8081)
