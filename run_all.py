@@ -10,7 +10,7 @@ import urllib3
 from pathlib import Path
 from dotenv import load_dotenv
 
-from bridge import ZulipNtfyBridge
+from bridge_all import ZulipNtfyBridge
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 

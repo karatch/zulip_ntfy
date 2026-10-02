@@ -54,7 +54,7 @@
 2. Убедитесь, что файл `zuliprc` находится в папке со скриптами `run.py` и `bridge.py`.
 3. Запустите сервис:
    ```bash
-   python3 run.py
+   python3 run_all.py
    ```
 
 
@@ -71,7 +71,7 @@
 
 2. Выполните сборку проекта одной командой:
    ```bash
-   pyinstaller --onefile --name zulip-ntfy-service run.py
+   pyinstaller --onefile --name zulip-ntfy-service run_all.py
    ```
 
 3. После успешного завершения процесса готовый файл появится в директории `dist/zulip-ntfy-service`.
