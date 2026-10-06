@@ -42,14 +42,14 @@ def load_config():
         zulip_site = config.get('api', 'site').rstrip('/')
         ntfy_host = os.getenv("NTFY_HOST", "https://ntfy.sh").rstrip('/')
         ntfy_token = os.getenv("NTFY_AUTH_TOKEN", None)
-        ntfy_prefix = os.getenv("NTFY_TOPIC_PREFIX", "zulip_goz")
+        ntfy_topic = os.getenv("NTFY_TOPIC_PREFIX", "zulip_goz")
 
         logging.info(f"[Main] Конфигурация успешно загружена. Целевой ntfy: {ntfy_host}")
         return {
             "zulip_site": zulip_site,
             "ntfy_host": ntfy_host,
             "ntfy_token": ntfy_token,
-            "ntfy_prefix": ntfy_prefix
+            "ntfy_topic": ntfy_topic
         }
     except Exception as e:
         raise KeyError(f"Ошибка чтения конфигурации: {e}")
@@ -77,7 +77,7 @@ async def main():
         zulip_site=config["zulip_site"],
         ntfy_host=config["ntfy_host"],
         ntfy_token=config["ntfy_token"],
-        ntfy_prefix=config["ntfy_prefix"],
+        ntfy_topic=config["ntfy_topic"],
         loop=loop,
         zuliprc_path=ZULIPRC_PATH
     )

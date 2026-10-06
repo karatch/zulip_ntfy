@@ -12,7 +12,7 @@ class ZulipNtfyBridge:
             self,
             zulip_site: str,
             ntfy_host: str,
-            ntfy_prefix: str,
+            ntfy_topic: str,
             ntfy_token: str,
             loop: asyncio.AbstractEventLoop,
             zuliprc_path: Path
@@ -20,15 +20,15 @@ class ZulipNtfyBridge:
         self.zulip_site = zulip_site
         self.ntfy_host = ntfy_host.rstrip('/')
         self.ntfy_token = ntfy_token
-        self.ntfy_topic = ntfy_prefix
+        self.ntfy_topic = ntfy_topic
         self.loop = loop
         self.zuliprc_path = zuliprc_path
         self.bot_email = None
         self.zulip_client = None
         self.session = None
         self.semaphore = asyncio.Semaphore(30)
-        self._listener_task = None
         self.active_push_tasks = set()
+        self._listener_task = None
 
         self.target_channel = os.getenv("TARGET_ZULIP_CHANNEL", "").strip().lower()
         if not self.target_channel:
@@ -172,7 +172,6 @@ class ZulipNtfyBridge:
             except asyncio.CancelledError:
                 logging.info("[Bridge] Задача слушателя Zulip отменена.")
 
-        # # жду пока все текущие задачи send_ntfy_push отпустят семафор
         # await self.semaphore.acquire()
         # self.semaphore.release()
 
