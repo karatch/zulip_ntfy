@@ -47,7 +47,6 @@ NTFY_TOPIC_PREFIX=secure_company_alerts
 # ИМЯ КАНАЛА В ZULIP, КОТОРЫЙ СЛУШАЕТ ШЛЮЗ (Чувствительно к регистру!)
 TARGET_ZULIP_CHANNEL=channel testing
 ```
-*Убедитесь, что файл `.env` добавлен в `.gitignore` вашего репозитория!*
 
 Положите рядом стандартный файл авторизации **`zuliprc`** вашего Generic-бота с правами Администратора организации Zulip:
 ```ini
