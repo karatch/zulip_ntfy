@@ -4,7 +4,6 @@ import os
 import zulip
 from pathlib import Path
 import urllib.parse
-
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -28,11 +27,11 @@ class ZulipNtfyBridge:
         self.zulip_client = None
         self.session = None
         self.semaphore = asyncio.Semaphore(30)
+        self._listener_task = None
 
         self.target_channel = os.getenv("TARGET_ZULIP_CHANNEL", "").strip().lower()
         if not self.target_channel:
             logging.warning("[Bridge] Переменная TARGET_ZULIP_CHANNEL не задана в .env!")
-
 
     async def send_ntfy_push(
             self,
@@ -44,7 +43,7 @@ class ZulipNtfyBridge:
     ) -> None:
         url = f"{self.ntfy_host}/{self.ntfy_topic}"
 
-        logging.info(f"[Bridge API] Отправка одного общего пуша в топик ntfy: {self.ntfy_topic}")
+        logging.info(f"[Bridge API] Отправка пуша в топик ntfy: {self.ntfy_topic}")
 
         headers = {
             "Title": f"Zulip [{stream_name}] -> {topic}",
@@ -60,61 +59,51 @@ class ZulipNtfyBridge:
 
         async with self.semaphore:
             try:
-                # один асинхронный POST-запрос с флагом ssl=False
+                # TODO (SECURITY): ssl=False отключает проверку сертификатов.
+                # используется только для отладки с самоподписанными сертификатами.
+                # в продакшене удалить и настроить ssl=SSLContext с корпоративным CA.
                 async with self.session.post(url, data=body.encode('utf-8'), headers=headers, timeout=3,
                                              ssl=False) as response:
                     if response.status == 200:
-                        logging.info(f"[Bridge API] Общий пуш успешно доставлен в топик {self.ntfy_topic}")
+                        logging.info(f"[Bridge API] Пуш успешно доставлен в топик {self.ntfy_topic}")
                     else:
                         res_text = await response.text()
                         logging.error(f"[Bridge API] Ошибка ntfy API (Статус {response.status}): {res_text}")
             except Exception as e:
-                logging.error(f"[Bridge API] Исключение сети при отправке общего пуша в ntfy: {e}")
-
+                logging.error(f"[Bridge API] Исключение сети при отправке пуша в ntfy: {e}")
 
     def process_event(self, event: dict) -> None:
         if event.get('type') != 'message':
             return
 
         msg = event['message']
-        if msg['sender_email'] == self.bot_email:
+        if msg['sender_email'] == self.bot_email or msg['type'] == 'private':
             return
 
-        if msg['type'] == 'private':
+        stream_name = msg.get('display_recipient')
+        if not isinstance(stream_name, str) or stream_name.strip().lower() != self.target_channel:
             return
 
-        stream_name = msg.get('display_recipient', 'Неизвестный стрим')
-        stream_id = msg.get('stream_id')
-
-        if not isinstance(stream_name, str):
-            return
-
-        if stream_name.strip().lower() != self.target_channel:
-            return
-
-        sender_id = msg['sender_id']
         sender_name = msg['sender_full_name']
         topic = msg.get('subject', 'Без темы')
         content = msg.get('content_raw', msg.get('content', ''))
         message_id = msg.get('id')
+        stream_id = msg.get('stream_id')
 
-        logging.info(f"[Bridge] Перехвачено сообщение из ЦЕЛЕВОГО канала [{stream_name}]. Автор Zulip ID: {sender_id}")
+        logging.info(f"[Bridge] Перехвачено сообщение из [{stream_name}]. Автор Zulip ID: {msg['sender_id']}")
 
-        # диплинк для Zulip 2026
         channel_slug = f"{stream_id}-{stream_name.lower().replace(' ', '-')}"
         encoded_topic = urllib.parse.quote(topic)
         msg_url = f"{self.zulip_site}/#narrow/channel/{channel_slug}/topic/{encoded_topic}/with/{message_id}"
 
         self.loop.call_soon_threadsafe(
-            lambda sn=stream_name: asyncio.create_task(
-                self.send_ntfy_push(sn, topic, sender_name, content, msg_url)
+            lambda: asyncio.create_task(
+                self.send_ntfy_push(stream_name, topic, sender_name, content, msg_url)
             )
         )
 
-
     def start_zulip_listener(self):
-        logging.info(
-            f"[Bridge] Установка соединения и запуск слушателя для целевого канала: [{os.getenv('TARGET_ZULIP_CHANNEL')}]...")
+        logging.info(f"[Bridge] Запуск слушателя Zulip для канала: [{self.target_channel}]...")
         try:
             self.zulip_client.call_on_each_event(
                 callback=self.process_event,
@@ -122,12 +111,16 @@ class ZulipNtfyBridge:
                 all_public_streams=True
             )
         except Exception as e:
-            logging.critical(f"[Bridge] Критическая ошибка потока прослушивания событий Zulip: {e}")
+            if not self._stop_listener_event.is_set():
+                logging.error(f"[Bridge] Слушатель Zulip прерван ошибкой: {e}")
+            else:
+                logging.info("[Bridge] Слушатель Zulip остановлен по флагу.")
 
-    async def start(self, session):
+    async def start(self, session, stop_event: asyncio.Event):
         self.session = session
 
-        while True:
+        # авторизация в Zulip
+        while not stop_event.is_set():
             try:
                 self.zulip_client = await asyncio.wait_for(
                     self.loop.run_in_executor(None, lambda: zulip.Client(config_file=str(self.zuliprc_path))),
@@ -136,26 +129,46 @@ class ZulipNtfyBridge:
                 self.bot_email = self.zulip_client.email
                 logging.info(f"[Bridge] Успешная авторизация в Zulip: {self.bot_email}")
                 break
-            except (asyncio.TimeoutError, Exception) as e:
+            except Exception as e:
                 logging.error(f"[Bridge] Ошибка авторизации в Zulip: {e}. Повтор через 15 секунд...")
                 await asyncio.sleep(15)
 
-        async def safe_listener_loop():
-            while True:
+        # запуск цикла жизни слушателя
+        async def listener_wrapper():
+            while not stop_event.is_set():
                 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ZulipListener")
-
                 for thread in executor._threads:
                     thread.daemon = True
 
                 try:
-                    logging.info("[Bridge] Запуск слушателя событий Zulip в выделенном системном потоке...")
                     await self.loop.run_in_executor(executor, self.start_zulip_listener)
                 except Exception as e:
                     logging.error(f"[Bridge] Поток слушателя Zulip аварийно завершился: {e}")
                 finally:
                     executor.shutdown(wait=False)
 
-                logging.info("[Bridge] Соединение с Zulip потеряно. Перезапуск слушателя через 15 секунд...")
-                await asyncio.sleep(15)
+                if not stop_event.is_set():
+                    logging.info("[Bridge] Соединение с Zulip потеряно. Перезапуск через 15 секунд...")
+                    try:
+                        await asyncio.wait_for(stop_event.wait(), timeout=15.0)
+                    except asyncio.TimeoutError:
+                        pass
 
-        asyncio.create_task(safe_listener_loop())
+        # сохраняю задачу для корректной отмены в shutdown
+        self._listener_task = asyncio.create_task(listener_wrapper())
+
+    async def shutdown(self):
+        logging.info("[Bridge] Инициализация завершения работы...")
+
+        if self._listener_task and not self._listener_task.done():
+            self._listener_task.cancel()
+            try:
+                await self._listener_task
+            except asyncio.CancelledError:
+                logging.info("[Bridge] Задача слушателя Zulip отменена.")
+
+        # даю время на завершение текущих HTTP-запросов (буферизация aiohttp)
+        logging.info("[Bridge] Ожидание завершения текущих задач отправки (3 секунды)...")
+        await asyncio.sleep(3)
+
+        logging.info("[Bridge] Завершение работы моста выполнено.")

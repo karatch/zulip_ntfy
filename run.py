@@ -56,18 +56,15 @@ def load_config():
 
 
 async def main():
-    # событие блокировки для принудительного выхода
     stop_event = asyncio.Event()
 
     def handle_exit_signal():
-        print("\n[Система] Сервис остановлен пользователем через Ctrl+C.")
+        logging.info("[Система] Получен сигнал остановки. Ожидаем завершения фоновых задач...")
         stop_event.set()
-        # принудительный выход из процесса
-        # sys.exit(0)
-        os._exit(0)
 
     loop = asyncio.get_running_loop()
     loop.add_signal_handler(signal.SIGINT, handle_exit_signal)
+    loop.add_signal_handler(signal.SIGTERM, handle_exit_signal)  # Добавлен SIGTERM для работы в Docker/K8s
 
     try:
         config = load_config()
@@ -76,7 +73,6 @@ async def main():
         return
 
     logging.info("[Main] Инициализация объекта ZulipNtfyBridge...")
-
     bridge = ZulipNtfyBridge(
         zulip_site=config["zulip_site"],
         ntfy_host=config["ntfy_host"],
@@ -89,15 +85,20 @@ async def main():
     try:
         async with aiohttp.ClientSession() as session:
             logging.info("[Main] Запуск фонового моста Zulip -> ntfy...")
-            await bridge.start(session)
+            await bridge.start(session, stop_event)
 
             await stop_event.wait()
+
+            # 10 секунд мосту на завершение
+            try:
+                await asyncio.wait_for(bridge.shutdown(), timeout=10.0)
+            except asyncio.TimeoutError:
+                logging.warning("[Main] Мост не успел завершить работу за 10 секунд, принудительный выход.")
+
     except Exception as e:
         logging.exception(f"[Main] Критическая ошибка в основном цикле: {e}")
 
 
 if __name__ == "__main__":
-    # try:
     asyncio.run(main())
-    # except KeyboardInterrupt:
-    #     logging.info("[Main] Сервис остановлен пользователем через Ctrl+C.")
+
