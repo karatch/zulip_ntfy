@@ -28,6 +28,7 @@ class ZulipNtfyBridge:
         self.session = None
         self.semaphore = asyncio.Semaphore(30)
         self._listener_task = None
+        self.active_push_tasks = set()
 
         self.target_channel = os.getenv("TARGET_ZULIP_CHANNEL", "").strip().lower()
         if not self.target_channel:
@@ -59,6 +60,8 @@ class ZulipNtfyBridge:
 
         async with self.semaphore:
             try:
+                task = asyncio.current_task()
+                self.active_push_tasks.add(task)
                 # TODO (SECURITY): ssl=False отключает проверку сертификатов.
                 # используется только для отладки с самоподписанными сертификатами.
                 # в продакшене удалить и настроить ssl=SSLContext с корпоративным CA.
@@ -71,6 +74,8 @@ class ZulipNtfyBridge:
                         logging.error(f"[Bridge API] Ошибка ntfy API (Статус {response.status}): {res_text}")
             except Exception as e:
                 logging.error(f"[Bridge API] Исключение сети при отправке пуша в ntfy: {e}")
+            finally:
+                self.active_push_tasks.discard(task)
 
     def process_event(self, event: dict) -> None:
         if event.get('type') != 'message':
@@ -167,11 +172,14 @@ class ZulipNtfyBridge:
             except asyncio.CancelledError:
                 logging.info("[Bridge] Задача слушателя Zulip отменена.")
 
-        # жду пока все текущие задачи send_ntfy_push отпустят семафор
-        await self.semaphore.acquire()
-        self.semaphore.release()
+        # # жду пока все текущие задачи send_ntfy_push отпустят семафор
+        # await self.semaphore.acquire()
+        # self.semaphore.release()
 
-        # aiohttp закрывает пул соединений
+        if self.active_push_tasks:
+            logging.info(f"[Bridge] Ожидаем завершения {len(self.active_push_tasks)} активных отправок...")
+            await asyncio.wait(self.active_push_tasks)
+
         if self.session:
             await self.session.close()
 
