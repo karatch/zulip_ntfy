@@ -160,15 +160,19 @@ class ZulipNtfyBridge:
     async def shutdown(self):
         logging.info("[Bridge] Инициализация завершения работы...")
 
-        if self._listener_task and not self._listener_task.done():
+        if self._listener_task:
             self._listener_task.cancel()
             try:
                 await self._listener_task
             except asyncio.CancelledError:
                 logging.info("[Bridge] Задача слушателя Zulip отменена.")
 
-        # даю время на завершение текущих HTTP-запросов (буферизация aiohttp)
-        logging.info("[Bridge] Ожидание завершения текущих задач отправки (3 секунды)...")
-        await asyncio.sleep(3)
+        # жду пока все текущие задачи send_ntfy_push отпустят семафор
+        await self.semaphore.acquire()
+        self.semaphore.release()
 
-        logging.info("[Bridge] Завершение работы моста выполнено.")
+        # aiohttp закрывает пул соединений
+        if self.session:
+            await self.session.close()
+
+        logging.info("[Bridge] Завершение работы моста завершено.")
