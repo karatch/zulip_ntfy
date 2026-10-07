@@ -25,8 +25,7 @@
 1. Если на вашем корпоративном сервере включена защита, приложение выдаст запрос на ввод учетных данных.
 2. Перейдите во вкладку настроек подписки и укажите ваш корпоративный **Логин** и **Пароль**, выданные администратором.
 
-Теперь, когда кто-то опубликует важное сообщение или алерт в целевом канале Zulip, уведомление мгновенно отобразится на экране вашего смартфона с указанием автора, темы и текста сообщения, а также прямой ссылкой на чат.
-
+Готово! Теперь уведомления из Zulip будут отображаться мгновенно.
 
 ## Инструкция по развертыванию для Администратора
 
@@ -45,19 +44,27 @@ NTFY_AUTH_TOKEN=tk_abcdef123456789
 NTFY_TOPIC_PREFIX=secure_company_alerts
 
 # ИМЯ КАНАЛА В ZULIP, КОТОРЫЙ СЛУШАЕТ ШЛЮЗ (Чувствительно к регистру!)
-TARGET_ZULIP_CHANNEL=channel testing
+TARGET_ZULIP_CHANNEL=alerts
 ```
 
-Положите рядом стандартный файл авторизации **`zuliprc`** вашего Generic-бота с правами Администратора организации Zulip:
+Положите рядом стандартный файл авторизации zuliprc вашего Generic-бота:
 ```ini
 [api]
 site = https://company.com
-email = push-bot-bot@://company.com
+email = push-bot-bot@company.com
 key = abcdefghijklmnopqrstuvwxyz123456
 ```
+**Важно:** Убедитесь, что файлы .env и zuliprc добавлены в .gitignore, чтобы не коммитить токены в репозиторий.
 
 ### 2. Установка зависимостей и запуск
-1. Установите необходимые библиотеки (из списка полностью исключены тяжелые движки СУБД):
+
+Рекомендуется использовать виртуальное окружение:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+1. Установите зависимости:
    ```bash
    pip install -r requirements.txt
    ```
@@ -72,15 +79,18 @@ key = abcdefghijklmnopqrstuvwxyz123456
 
 Выполните сборку проекта одной командой:
    ```bash
-   pyinstaller --onefile --name zulip-ntfy-service run_all.py
+   pyinstaller --onefile --name zulip-ntfy-bridge run.py
    ```
 
 Для обеспечения непрерывной работы 24/7 настройте шлюз как системную службу от имени безопасного изолированного пользователя. Так как это Stateless-архитектура, процессу не нужны права на запись данных на диск.
 
 1. Создайте системного пользователя и передайте ему права на папку проекта:
    ```bash
-   sudo useradd -r -s /bin/false zulip-push
-   sudo chown -R zulip-push:zulip-push /opt/zulip-ntfy
+   sudo useradd -r -s /bin/false zulip-push 
+   sudo mkdir -p /opt/zulip-ntfy 
+   sudo cp zulip-ntfy-bridge zuliprc .env /opt/zulip-ntfy/ 
+   sudo chown -R zulip-push:zulip-push /opt/zulip-ntfy 
+   sudo chmod 600 /opt/zulip-ntfy/.env /opt/zulip-ntfy/zuliprc
    ```
 
 2. Создайте файл службы `/etc/systemd/system/zulip-ntfy-bridge.service`:
@@ -94,13 +104,20 @@ key = abcdefghijklmnopqrstuvwxyz123456
    User=zulip-push
    Group=zulip-push
    WorkingDirectory=/opt/zulip-ntfy
-   EnvironmentFile=/opt/zulip-ntfy/.env
-   ExecStart=/usr/bin/python3 /opt/zulip-ntfy/run.py
+   # Указываем бинарный файл, если использовали PyInstaller
+   ExecStart=/opt/zulip-ntfy/zulip-ntfy-bridge
+   # Если запускаете через интерпретатор:
+   # ExecStart=/usr/bin/python3 /opt/zulip-ntfy/run.py
+
    Restart=always
    RestartSec=10
-   StandardOutput=syslog
-   StandardError=syslog
+   StandardOutput=journal
+   StandardError=journal
    SyslogIdentifier=zulip-ntfy-bridge
+
+   # Безопасность: изоляция и запрет записи на диск
+   PrivateTmp=true
+   ReadWritePaths=
 
    [Install]
    WantedBy=multi-user.target
