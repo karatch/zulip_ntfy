@@ -43,10 +43,17 @@ def load_config():
         ntfy_host = os.getenv("NTFY_HOST", "https://ntfy.sh").rstrip('/')
         ntfy_token = os.getenv("NTFY_AUTH_TOKEN", None)
         ntfy_topic = os.getenv("NTFY_TOPIC_PREFIX", "zulip_goz")
-        target_channel = os.getenv("TARGET_ZULIP_CHANNEL", "")
-        if not target_channel:
-            logging.critical("[Main] TARGET_ZULIP_CHANNEL пуст. Мост не сможет фильтровать сообщения.")
+        target_stream_id_str = os.getenv("TARGET_ZULIP_STREAM_ID", "")
+
+        if not target_stream_id_str:
+            logging.critical("[Main] TARGET_ZULIP_STREAM_ID пуст. Мост не сможет фильтровать сообщения.")
             return None  # останавливаю запуск
+
+        try:
+            target_stream_id = int(target_stream_id_str)
+        except ValueError:
+            logging.critical("[Main] TARGET_ZULIP_STREAM_ID должен быть целым числом (ID канала).")
+            return None
 
         logging.info(f"[Main] Конфигурация успешно загружена. Целевой ntfy: {ntfy_host}")
         return {
@@ -54,7 +61,7 @@ def load_config():
             "ntfy_host": ntfy_host,
             "ntfy_token": ntfy_token,
             "ntfy_topic": ntfy_topic,
-            "target_channel": target_channel
+            "target_stream_id": target_stream_id
         }
     except Exception as e:
         raise KeyError(f"Ошибка чтения конфигурации: {e}")
@@ -83,7 +90,7 @@ async def main():
         ntfy_host=config["ntfy_host"],
         ntfy_token=config["ntfy_token"],
         ntfy_topic=config["ntfy_topic"],
-        target_channel=config["target_channel"],
+        target_stream_id=config["target_stream_id"],
         loop=loop,
         zuliprc_path=ZULIPRC_PATH
     )

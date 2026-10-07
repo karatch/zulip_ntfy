@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import zulip
 from pathlib import Path
 import urllib.parse
@@ -14,7 +13,7 @@ class ZulipNtfyBridge:
             ntfy_host: str,
             ntfy_topic: str,
             ntfy_token: str,
-            target_channel: str,
+            target_stream_id: int,
             loop: asyncio.AbstractEventLoop,
             zuliprc_path: Path
     ):
@@ -22,7 +21,7 @@ class ZulipNtfyBridge:
         self.ntfy_host = ntfy_host.rstrip('/')
         self.ntfy_token = ntfy_token
         self.ntfy_topic = ntfy_topic
-        self.target_channel = target_channel.strip().lower()
+        self.target_stream_id = target_stream_id
         self.loop = loop
         self.zuliprc_path = zuliprc_path
         self.bot_email = None
@@ -32,8 +31,6 @@ class ZulipNtfyBridge:
         self.active_push_tasks = set()
         self._listener_task = None
         self._stop_listener_event = asyncio.Event()
-        # if not self.target_channel:
-        #     logging.warning("[Bridge] Переменная TARGET_ZULIP_CHANNEL не задана в .env!")
 
     async def send_ntfy_push(
             self,
@@ -80,25 +77,30 @@ class ZulipNtfyBridge:
 
     def process_event(self, event: dict) -> None:
         if event.get('type') != 'message':
-            return
+            return None
 
         msg = event['message']
-        if msg['sender_email'] == self.bot_email or msg['type'] == 'private':
-            return
+        if msg['sender_email'] == self.bot_email or msg['type'] != 'stream':
+            return None
 
         stream_name = msg.get('display_recipient')
         if not isinstance(stream_name, str):
-            return
+            return None
+
+        # выходим, если у сообщения нет stream_id (ошибка API) или ID не совпадает с целевым
+        event_stream_id = msg.get('stream_id')
+        if event_stream_id is None or event_stream_id != self.target_stream_id:
+            return None
 
         sender_name = msg['sender_full_name']
         topic = msg.get('subject', 'Без темы')
         content = msg.get('content_raw', msg.get('content', ''))
         message_id = msg.get('id')
-        stream_id = msg.get('stream_id')
+        # stream_id = msg.get('stream_id')
 
         logging.info(f"[Bridge] Перехвачено сообщение из [{stream_name}]. Автор Zulip ID: {msg['sender_id']}")
 
-        channel_slug = f"{stream_id}-{stream_name.lower().replace(' ', '-')}"
+        channel_slug = f"{event_stream_id}-{stream_name.lower().replace(' ', '-')}"
         encoded_topic = urllib.parse.quote(topic)
         msg_url = f"{self.zulip_site}/#narrow/channel/{channel_slug}/topic/{encoded_topic}/with/{message_id}"
 
@@ -108,9 +110,10 @@ class ZulipNtfyBridge:
                 name="ntfy-push-sender"
             )
         )
+        return None
 
     def start_zulip_listener(self):
-        logging.info(f"[Bridge] Запуск слушателя Zulip для канала: [{self.target_channel}]...")
+        logging.info(f"[Bridge] Запуск слушателя Zulip для канала: [{self.target_stream_id}]...")
         try:
             self.zulip_client.call_on_each_event(
                 callback=self.process_event,
