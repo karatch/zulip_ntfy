@@ -14,6 +14,7 @@ class ZulipNtfyBridge:
             ntfy_host: str,
             ntfy_topic: str,
             ntfy_token: str,
+            target_channel: str,
             loop: asyncio.AbstractEventLoop,
             zuliprc_path: Path
     ):
@@ -21,6 +22,7 @@ class ZulipNtfyBridge:
         self.ntfy_host = ntfy_host.rstrip('/')
         self.ntfy_token = ntfy_token
         self.ntfy_topic = ntfy_topic
+        self.target_channel = target_channel.strip().lower()
         self.loop = loop
         self.zuliprc_path = zuliprc_path
         self.bot_email = None
@@ -29,10 +31,9 @@ class ZulipNtfyBridge:
         self.semaphore = asyncio.Semaphore(30)
         self.active_push_tasks = set()
         self._listener_task = None
-
-        self.target_channel = os.getenv("TARGET_ZULIP_CHANNEL", "").strip().lower()
-        if not self.target_channel:
-            logging.warning("[Bridge] Переменная TARGET_ZULIP_CHANNEL не задана в .env!")
+        self._stop_listener_event = asyncio.Event()
+        # if not self.target_channel:
+        #     logging.warning("[Bridge] Переменная TARGET_ZULIP_CHANNEL не задана в .env!")
 
     async def send_ntfy_push(
             self,
@@ -86,7 +87,7 @@ class ZulipNtfyBridge:
             return
 
         stream_name = msg.get('display_recipient')
-        if not isinstance(stream_name, str) or stream_name.strip().lower() != self.target_channel:
+        if not isinstance(stream_name, str):
             return
 
         sender_name = msg['sender_full_name']
@@ -103,7 +104,8 @@ class ZulipNtfyBridge:
 
         self.loop.call_soon_threadsafe(
             lambda: asyncio.create_task(
-                self.send_ntfy_push(stream_name, topic, sender_name, content, msg_url)
+                self.send_ntfy_push(stream_name, topic, sender_name, content, msg_url),
+                name="ntfy-push-sender"
             )
         )
 
@@ -136,7 +138,11 @@ class ZulipNtfyBridge:
                 break
             except Exception as e:
                 logging.error(f"[Bridge] Ошибка авторизации в Zulip: {e}. Повтор через 15 секунд...")
-                await asyncio.sleep(15)
+                # await asyncio.sleep(15)
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    pass
 
         # запуск цикла жизни слушателя
         async def listener_wrapper():
@@ -171,9 +177,6 @@ class ZulipNtfyBridge:
                 await self._listener_task
             except asyncio.CancelledError:
                 logging.info("[Bridge] Задача слушателя Zulip отменена.")
-
-        # await self.semaphore.acquire()
-        # self.semaphore.release()
 
         if self.active_push_tasks:
             logging.info(f"[Bridge] Ожидаем завершения {len(self.active_push_tasks)} активных отправок...")
