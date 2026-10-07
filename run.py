@@ -88,10 +88,12 @@ async def main():
             await bridge.start(session, stop_event)
 
             await stop_event.wait()
+            logging.info("[Main] Сигнал остановки получен. Начинаем завершение...")
 
             # 10 секунд мосту на завершение
             try:
                 await asyncio.wait_for(bridge.shutdown(), timeout=10.0)
+                logging.info("[Main] Мост завершил работу штатно.")
             except asyncio.TimeoutError:
                 logging.warning("[Main] Мост не успел завершить работу за 10 секунд, принудительный выход.")
 
@@ -101,4 +103,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
