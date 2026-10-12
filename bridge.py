@@ -128,12 +128,10 @@ class ZulipNtfyBridge:
     async def start(self, session, stop_event: asyncio.Event):
         self.session = session
 
-        ### NEW CODE START
-        url = f"{self.ntfy_host}/startup_ping"
-        headers = {"Title": "Startup Ping"}
-        body = "The bridge is now up and listening to the zulip stream!"
-        await self.send_ntfy_push(stream_name="[System]", topic="Startup Ping", sender_name="Bridge", message_content=body, msg_url="#")
-        ### NEW CODE END
+        # ### NEW CODE START
+        # body = "The bridge is now up and listening to the zulip stream!"
+        # await self.send_ntfy_push(stream_name="[System]", topic="Startup Ping", sender_name="Bridge", message_content=body, msg_url="#")
+        # ### NEW CODE END
 
         # авторизация в Zulip
         while not stop_event.is_set():
