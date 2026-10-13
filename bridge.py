@@ -136,12 +136,23 @@ class ZulipNtfyBridge:
         # авторизация в Zulip
         while not stop_event.is_set():
             try:
+                logging.info(f"[Bridge] Выполнение авторизации в Zulip: {self.bot_email}")
                 self.zulip_client = await asyncio.wait_for(
                     self.loop.run_in_executor(None, lambda: zulip.Client(config_file=str(self.zuliprc_path))),
                     timeout=10.0
                 )
                 self.bot_email = self.zulip_client.email
+                # logging.info(f"[Bridge] Успешная авторизация в Zulip: {self.bot_email}")
+
+                # проверка, реальный ли запрос к API
+                result = await self.loop.run_in_executor(
+                    None, lambda: self.zulip_client.get_streams()
+                )
+                if not result["result"] == "success":
+                    raise Exception("Failed to fetch streams from Zulip")
+                logging.info("[Bridge] Initial API call succeeded.")
                 logging.info(f"[Bridge] Успешная авторизация в Zulip: {self.bot_email}")
+
                 break
             except Exception as e:
                 logging.error(f"[Bridge] Ошибка авторизации в Zulip: {e}. Повтор через 15 секунд...")
@@ -172,7 +183,7 @@ class ZulipNtfyBridge:
                     except asyncio.TimeoutError:
                         pass
 
-        # сохраняю задачу для корректной отмены в shutdown
+        # сохранение задачи для корректной отмены в shutdown
         self._listener_task = asyncio.create_task(listener_wrapper())
 
     async def shutdown(self):
